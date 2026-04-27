@@ -6,8 +6,11 @@ from backend.main import register, RegisterRequest, LoginRequest, login, ForgotP
 
 # ... vos autres imports
 
-app = FastAPI(title="VoxText API", version="1.0.0")  # ← décommentez ça
+app = FastAPI(title="VoxText API", version="1.0.0")  
 
+@app.get("/")
+def root():
+    return {"status": "ok"}
 
 # Puis enregistrez vos fonctions comme routes :
 @app.post("/register")
