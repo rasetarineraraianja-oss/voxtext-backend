@@ -1,0 +1,20 @@
+https://youtu.be/XvTQJM7mh28?si=jQkuNLv3PLdaQTVy | mp3 | error | [0;31mERROR:[0m [youtube] XvTQJM7mh28: This video is not available
+https://www.youtube.com/watch?v=XvTQJM7mh28 | mp3 | error | [0;31mERROR:[0m [youtube] XvTQJM7mh28: This video is not available
+https://youtu.be/XvTQJM7mh28?si=jQkuNLv3PLdaQTVy | mp3 | error | [0;31mERROR:[0m [youtube] XvTQJM7mh28: This video is not available
+https://youtu.be/XvTQJM7mh28?si=pfRdofMizyaeBvOu | mp3 | error | [0;31mERROR:[0m [youtube] XvTQJM7mh28: This video is not available
+https://youtube.com/shorts/m140SaAGqfU?si=nXUl8JoC6h8kjMfP | mp3 | error | [0;31mERROR:[0m [youtube] m140SaAGqfU: This video is not available
+https://youtu.be/SWRRSwCbJsM?si=UvSTeC31FPXNa9BM | mp4 | error | [0;31mERROR:[0m [download] Got error: ("Connection broken: ConnectionResetError(10054, 'Une connexion existante a dû être fermée par l’hôte distant', None, 10054, None)", ConnectionResetError(10054, 'Une connexion existante a dû être fermée par l’hôte distant', None, 10054, None))
+https://youtu.be/SWRRSwCbJsM?si=UvSTeC31FPXNa9BM | mp3 | success | None
+https://youtu.be/xNa7yEfRAKY?si=hIqjh0wxXTjTWm71 | mp4 | success | None
+https://youtu.be/xNa7yEfRAKY?si=U1wbb5skCVlDSPOS | mp4 | success | None
+https://youtu.be/XvTQJM7mh28?si=dljYGCqsEFdAudeQ | mp3 | error | [0;31mERROR:[0m [youtube] XvTQJM7mh28: This video is not available
+https://youtu.be/XvTQJM7mh28?si=dljYGCqsEFdAudeQ | mp4 | error | [0;31mERROR:[0m [youtube] XvTQJM7mh28: This video is not available
+https://youtu.be/ZhXYg_uklBA?si=0kSUFgPTIUvhtV82 | mp4 | error | yt-dlp non installé
+https://youtu.be/ZhXYg_uklBA?si=0kSUFgPTIUvhtV82 | mp4 | success | None
+https://youtu.be/ZhXYg_uklBA?si=0kSUFgPTIUvhtV82 | mp3 | success | None
+https://youtu.be/ZhXYg_uklBA?si=0kSUFgPTIUvhtV82 | mp4 | success | None
+https://youtu.be/zFwaRmpzvjo?si=C4TqNujUJt-f3eVY | mp4 | success | None
+https://youtu.be/RXuJTxZMC1Y?si=chMWD4GH6_p4duWS | mp4 | success | None
+https://youtu.be/jQY_QL_wvQU?si=KLjjliy9tF-12rE- | mp4 | success | None
+https://youtu.be/F_WYP67U59g?si=u2Sij9__CuzlPnZZ | mp4 | error | [0;31mERROR:[0m [download] Got error: HTTPSConnectionPool(host='rr5---sn-woc7kn7y.googlevideo.com', port=443): Read timed out.
+https://youtu.be/F_WYP67U59g?si=u2Sij9__CuzlPnZZ | mp4 | success | None

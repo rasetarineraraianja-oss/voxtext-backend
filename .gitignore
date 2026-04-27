@@ -1,0 +1,16 @@
+@"
+dist/
+build/
+*.exe
+*.pkg
+*.pyz
+__pycache__/
+*.pyc
+.venv/
+venv/
+*.db
+data/
+.env
+logo.png
+logo2.png
+"@ | Out-File .gitignore -Encoding utf8
