@@ -7,17 +7,17 @@ from datetime import datetime, timedelta
 import stripe
 import httpx
 from fastapi import FastAPI, Request
-from fastapi.responses import JSONResponse, HTMLResponse
+from fastapi.responses import JSONResponse, HTMLResponse, Response
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from database import get_connection
 
 # =============================================================
-# CONFIGURATION — variables d'environnement Render
+# CONFIGURATION
 # =============================================================
-stripe.api_key = os.environ.get("STRIPE_SECRET_KEY", "sk_test_51T4yleGjzNL4AeaeqolgABR4i3K8ytKTzu0C8pslkBmMIiE9QeCwTED2dY1wP3zioGkijJQDLj0fd8XznqV1jq9V00zpDaJv8c")
+stripe.api_key        = os.environ.get("STRIPE_SECRET_KEY", "sk_test_51T4yleGjzNL4AeaeqolgABR4i3K8ytKTzu0C8pslkBmMIiE9QeCwTED2dY1wP3zioGkijJQDLj0fd8XznqV1jq9V00zpDaJv8c")
 STRIPE_WEBHOOK_SECRET = os.environ.get("STRIPE_WEBHOOK_SECRET", "whsec_2f0d49755e804edb2ebe863b259b21659360426bc5030653ddeb95232ea012d4")
-STRIPE_PRICE_ID = os.environ.get("STRIPE_PRICE_ID", "price_1TNUhqGjzNL4Aeaez0WnrMns")
+STRIPE_PRICE_ID       = os.environ.get("STRIPE_PRICE_ID", "price_1TNUhqGjzNL4Aeaez0WnrMns")
 
 PAYPAL_CLIENT_ID     = os.environ.get("PAYPAL_CLIENT_ID", "")
 PAYPAL_CLIENT_SECRET = os.environ.get("PAYPAL_CLIENT_SECRET", "")
@@ -69,11 +69,10 @@ def root():
 
 @app.head("/")
 def head_root():
-    from fastapi.responses import Response
     return Response(status_code=200)
 
 # =============================================================
-# AUTH — routes existantes conservées
+# AUTH
 # =============================================================
 @app.post("/register")
 def route_register(data: RegisterRequest):
@@ -88,15 +87,18 @@ def route_register(data: RegisterRequest):
     now          = datetime.now().isoformat()
 
     with get_connection() as conn:
-        if conn.execute("SELECT id FROM users WHERE email=?", (email,)).fetchone():
-            return {"error": "email_exists"}
-        conn.execute("""
-            INSERT INTO users
-                (id, email, password, plan, created_at,
-                 device_fingerprint, last_seen, is_verified, verify_token)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-        """, (str(uuid.uuid4()), email, hashed, "free", now,
-              str(uuid.uuid4()), now, 1, verify_token))
+        with conn.cursor() as cur:
+            cur.execute("SELECT id FROM users WHERE email=%s", (email,))
+            if cur.fetchone():
+                return {"error": "email_exists"}
+            cur.execute("""
+                INSERT INTO users
+                    (id, email, password, plan, created_at,
+                     device_fingerprint, last_seen, is_verified, verify_token)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+            """, (str(uuid.uuid4()), email, hashed, "free", now,
+                  str(uuid.uuid4()), now, 1, verify_token))
+        conn.commit()
 
     return {"status": "ok", "message": "Compte créé."}
 
@@ -110,7 +112,9 @@ def route_login(data: LoginRequest):
         return {"error": "missing_fields"}
 
     with get_connection() as conn:
-        user = conn.execute("SELECT * FROM users WHERE email=?", (email,)).fetchone()
+        with conn.cursor() as cur:
+            cur.execute("SELECT * FROM users WHERE email=%s", (email,))
+            user = cur.fetchone()
 
     if not user:
         return {"error": "user_not_found"}
@@ -120,14 +124,16 @@ def route_login(data: LoginRequest):
         return {"error": "invalid_password"}
 
     with get_connection() as conn:
-        conn.execute("UPDATE users SET last_seen=? WHERE email=?",
-                     (datetime.now().isoformat(), email))
+        with conn.cursor() as cur:
+            cur.execute("UPDATE users SET last_seen=%s WHERE email=%s",
+                        (datetime.now().isoformat(), email))
+        conn.commit()
 
     return {
         "status":      "ok",
         "email":       email,
         "plan":        user["plan"],
-        "pro_expires": user["pro_expires"] if "pro_expires" in user.keys() else None,
+        "pro_expires": user["pro_expires"],
     }
 
 
@@ -136,9 +142,12 @@ def route_forgot(data: ForgotPasswordRequest):
     email = data.email.strip().lower()
     token = str(uuid.uuid4())
     with get_connection() as conn:
-        if not conn.execute("SELECT id FROM users WHERE email=?", (email,)).fetchone():
-            return {"error": "user_not_found"}
-        conn.execute("UPDATE users SET reset_token=? WHERE email=?", (token, email))
+        with conn.cursor() as cur:
+            cur.execute("SELECT id FROM users WHERE email=%s", (email,))
+            if not cur.fetchone():
+                return {"error": "user_not_found"}
+            cur.execute("UPDATE users SET reset_token=%s WHERE email=%s", (token, email))
+        conn.commit()
     link = f"{APP_BASE_URL}/reset-password?token={token}"
     return {"status": "ok", "reset_link": link}
 
@@ -147,13 +156,15 @@ def route_forgot(data: ForgotPasswordRequest):
 def route_reset(data: ResetPasswordRequest):
     hashed = bcrypt.hashpw(data.password.encode(), bcrypt.gensalt()).decode()
     with get_connection() as conn:
-        user = conn.execute("SELECT id FROM users WHERE reset_token=?",
-                            (data.token,)).fetchone()
-        if not user:
-            return {"error": "invalid_token"}
-        conn.execute(
-            "UPDATE users SET password=?, reset_token=NULL WHERE reset_token=?",
-            (hashed, data.token))
+        with conn.cursor() as cur:
+            cur.execute("SELECT id FROM users WHERE reset_token=%s", (data.token,))
+            user = cur.fetchone()
+            if not user:
+                return {"error": "invalid_token"}
+            cur.execute(
+                "UPDATE users SET password=%s, reset_token=NULL WHERE reset_token=%s",
+                (hashed, data.token))
+        conn.commit()
     return {"status": "password_updated"}
 
 
@@ -161,10 +172,11 @@ def route_reset(data: ResetPasswordRequest):
 def route_get_user(email: str):
     email = email.strip().lower()
     with get_connection() as conn:
-        user = conn.execute(
-            "SELECT email, plan, pro_expires, created_at FROM users WHERE email=?",
-            (email,)
-        ).fetchone()
+        with conn.cursor() as cur:
+            cur.execute(
+                "SELECT email, plan, pro_expires, created_at FROM users WHERE email=%s",
+                (email,))
+            user = cur.fetchone()
     if not user:
         return {"error": "not_found"}
     return {
@@ -177,12 +189,11 @@ def route_get_user(email: str):
 
 @app.post("/check-access")
 def route_check_access(data: AccessRequest):
-    import billing
     email = data.email.strip().lower()
     with get_connection() as conn:
-        user = conn.execute(
-            "SELECT plan, pro_expires FROM users WHERE email=?", (email,)
-        ).fetchone()
+        with conn.cursor() as cur:
+            cur.execute("SELECT plan, pro_expires FROM users WHERE email=%s", (email,))
+            user = cur.fetchone()
     if not user:
         return {"error": "user_not_found"}
     if user["plan"] == "pro":
@@ -192,25 +203,25 @@ def route_check_access(data: AccessRequest):
         except Exception:
             pass
         with get_connection() as conn:
-            conn.execute("UPDATE users SET plan='free' WHERE email=?", (email,))
-    remaining = billing.remaining_free()
-    if remaining <= 0:
-        return {"error": "limit_reached"}
-    return {"status": "ok", "access": "limited", "remaining": remaining}
+            with conn.cursor() as cur:
+                cur.execute("UPDATE users SET plan='free' WHERE email=%s", (email,))
+            conn.commit()
+    return {"status": "ok", "access": "limited"}
 
 
-# ✅ Route existante conservée + corrigée (pro_expires manquait)
 @app.get("/activate-pro/{email}")
 def route_activate_pro(email: str):
     email = email.strip().lower()
     with get_connection() as conn:
-        if not conn.execute("SELECT id FROM users WHERE email=?", (email,)).fetchone():
-            return {"error": "user_not_found"}
+        with conn.cursor() as cur:
+            cur.execute("SELECT id FROM users WHERE email=%s", (email,))
+            if not cur.fetchone():
+                return {"error": "user_not_found"}
     _activate_pro(email, "manual")
     with get_connection() as conn:
-        user = conn.execute(
-            "SELECT plan, pro_expires FROM users WHERE email=?", (email,)
-        ).fetchone()
+        with conn.cursor() as cur:
+            cur.execute("SELECT plan, pro_expires FROM users WHERE email=%s", (email,))
+            user = cur.fetchone()
     return {
         "status":      "pro_activated",
         "email":       email,
@@ -228,7 +239,9 @@ def create_stripe_session(data: dict):
     if not email:
         return {"error": "missing_email"}
     with get_connection() as conn:
-        user = conn.execute("SELECT plan FROM users WHERE email=?", (email,)).fetchone()
+        with conn.cursor() as cur:
+            cur.execute("SELECT plan FROM users WHERE email=%s", (email,))
+            user = cur.fetchone()
     if not user:
         return {"error": "user_not_found"}
     if user["plan"] == "pro":
@@ -250,11 +263,9 @@ def create_stripe_session(data: dict):
         )
         print(f"[Stripe] Session créée pour {email}", flush=True)
         return {"status": "ok", "checkout_url": session.url, "provider": "stripe"}
-    except stripe.error.StripeError as e:
+    except Exception as e:
         print(f"[Stripe] ❌ {e}", flush=True)
         return {"error": str(e)}
-    except Exception as e:
-        return {"error": "internal_error"}
 
 
 # =============================================================
@@ -280,7 +291,6 @@ async def stripe_webhook(request: Request):
                  "invoice.payment_succeeded",
                  "invoice.payment_paid",
                  "invoice_payment.paid"):
-
         email = resource.get("metadata", {}).get("user_email", "")
         if not email:
             email = (resource.get("customer_email")
@@ -293,12 +303,9 @@ async def stripe_webhook(request: Request):
                     email    = customer.get("email", "")
                 except Exception as e:
                     print(f"[Stripe] ❌ customer : {e}", flush=True)
-
         print(f"[Stripe] Email : {email!r}", flush=True)
         if email:
             _activate_pro(email, "stripe")
-        else:
-            print(f"[Stripe] ✖ Email introuvable pour {etype}", flush=True)
 
     elif etype == "customer.subscription.deleted":
         try:
@@ -311,9 +318,6 @@ async def stripe_webhook(request: Request):
 
     elif etype == "invoice.payment_failed":
         print(f"[Stripe] ⚠ Paiement échoué", flush=True)
-
-    else:
-        print(f"[Stripe] Ignoré : {etype}", flush=True)
 
     return {"status": "ok"}
 
@@ -388,7 +392,6 @@ def payment_success(session_id: str = "", email: str = "", provider: str = "stri
             document.getElementById('countdown').textContent = n;
             if (n <= 0) {{ clearInterval(timer); closeTab(); }}
         }}, 1000);
-
         function closeTab() {{
             window.close();
             setTimeout(function() {{
@@ -442,7 +445,7 @@ def payment_cancelled(provider: str = ""):
            Retournez dans VoxText et réessayez à tout moment.</p>
         <button class="btn" onclick="window.close()">Fermer cette page</button>
     </div>
-    <script>setTimeout(function() {{ window.close(); }}, 5000);</script>
+    <script>setTimeout(function() { window.close(); }, 5000);</script>
 </body>
 </html>
 """)
@@ -489,7 +492,9 @@ async def create_paypal_subscription(data: dict):
     if not email:
         return {"error": "missing_email"}
     with get_connection() as conn:
-        user = conn.execute("SELECT plan FROM users WHERE email=?", (email,)).fetchone()
+        with conn.cursor() as cur:
+            cur.execute("SELECT plan FROM users WHERE email=%s", (email,))
+            user = cur.fetchone()
     if not user:
         return {"error": "user_not_found"}
     if user["plan"] == "pro":
@@ -559,18 +564,18 @@ async def paypal_webhook(request: Request):
 # HELPERS DB
 # =============================================================
 def _activate_pro(email: str, provider: str = ""):
-    """Active le plan Pro — met à jour plan, pro_expires ET payment_provider."""
     email  = email.strip().lower()
     expiry = (datetime.now() + timedelta(days=31)).isoformat()
     with get_connection() as conn:
-        rows = conn.execute(
-            """UPDATE users
-               SET plan='pro', pro_expires=?, payment_provider=?, used_trials=0
-               WHERE email=?""",
-            (expiry, provider, email)
-        ).rowcount
-    print(f"[DB] ✔ Pro ({provider}) → {email} | rows={rows} | expire={expiry[:10]}",
-          flush=True)
+        with conn.cursor() as cur:
+            cur.execute("""
+                UPDATE users
+                SET plan='pro', pro_expires=%s, payment_provider=%s, used_trials=0
+                WHERE email=%s
+            """, (expiry, provider, email))
+            rows = cur.rowcount
+        conn.commit()
+    print(f"[DB] ✔ Pro ({provider}) → {email} | rows={rows} | expire={expiry[:10]}", flush=True)
     if rows == 0:
         print(f"[DB] ✖ Aucun user : {email!r}", flush=True)
 
@@ -578,6 +583,8 @@ def _activate_pro(email: str, provider: str = ""):
 def _downgrade_to_free(email: str):
     email = email.strip().lower()
     with get_connection() as conn:
-        conn.execute(
-            "UPDATE users SET plan='free', pro_expires=NULL WHERE email=?", (email,))
+        with conn.cursor() as cur:
+            cur.execute(
+                "UPDATE users SET plan='free', pro_expires=NULL WHERE email=%s", (email,))
+        conn.commit()
     print(f"[DB] Free → {email}", flush=True)
