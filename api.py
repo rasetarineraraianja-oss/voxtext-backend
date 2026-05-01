@@ -15,9 +15,9 @@ from database import get_connection
 # =============================================================
 # CONFIGURATION
 # =============================================================
-STRIPE_PRICE_ID = os.environ.get("STRIPE_PRICE_ID", "price_1TRpIAGjzNL4AeaeEDsVb9i2")
+stripe.api_key        = os.environ.get("STRIPE_SECRET_KEY", "sk_test_51T4yleGjzNL4AeaeqolgABR4i3K8ytKTzu0C8pslkBmMIiE9QeCwTED2dY1wP3zioGkijJQDLj0fd8XznqV1jq9V00zpDaJv8c")
 STRIPE_WEBHOOK_SECRET = os.environ.get("STRIPE_WEBHOOK_SECRET", "whsec_2f0d49755e804edb2ebe863b259b21659360426bc5030653ddeb95232ea012d4")
-STRIPE_PRICE_ID       = os.environ.get("STRIPE_PRICE_ID", "price_1TNUhqGjzNL4Aeaez0WnrMns")
+STRIPE_PRICE_ID       = os.environ.get("STRIPE_PRICE_ID", "price_1TRpIAGjzNL4AeaeEDsVb9i2")
 
 PAYPAL_CLIENT_ID     = os.environ.get("PAYPAL_CLIENT_ID", "")
 PAYPAL_CLIENT_SECRET = os.environ.get("PAYPAL_CLIENT_SECRET", "")
