@@ -180,14 +180,13 @@ def route_reset(data: ResetPasswordRequest):
         conn.commit()
     return {"status": "password_updated"}
 
-
 @app.get("/user/{email}")
 def route_get_user(email: str):
     email = email.strip().lower()
     with get_connection() as conn:
         with conn.cursor() as cur:
             cur.execute(
-                "SELECT email, plan, pro_expires, created_at FROM users WHERE email=%s",
+                "SELECT email, plan, pro_expires, created_at, used_trials FROM users WHERE email=%s",
                 (email,))
             user = cur.fetchone()
     if not user:
@@ -197,8 +196,21 @@ def route_get_user(email: str):
         "plan":        user["plan"],
         "pro_expires": user["pro_expires"],
         "created_at":  user["created_at"],
+        "used_trials": user["used_trials"] or 0,
     }
 
+@app.post("/increment-trials")
+def route_increment_trials(data: dict):
+    email = data.get("email", "").strip().lower()
+    if not email:
+        return {"error": "missing_email"}
+    with get_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                "UPDATE users SET used_trials = used_trials + 1 WHERE email=%s",
+                (email,))
+        conn.commit()
+    return {"status": "ok"}
 
 @app.post("/check-access")
 def route_check_access(data: AccessRequest):
