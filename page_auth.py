@@ -189,8 +189,16 @@ class AuthPage:
                 f.write(email)
 
             self.login_status.config(text="✔ Connexion réussie", fg=SUCCESS)
+            # ✅ SUCCESS
+            with open("session.txt", "w") as f:
+                f.write(email)
+            
+            import billing
+            billing.set_email(email)  # ← ajoute cette ligne
+            
+            self.login_status.config(text="✔ Connexion réussie", fg=SUCCESS)
             self._on_success(email)
-
+            
         except requests.exceptions.ConnectionError:
             self.login_status.config(text="Serveur inaccessible ❌", fg=ERROR)
 
