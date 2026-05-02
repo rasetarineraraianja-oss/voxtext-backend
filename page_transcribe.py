@@ -544,10 +544,9 @@ class TranscribePage:
 
         email = self.get_user().get("email")  # adapte selon ton code
 
-        import requests
-
+        from constants import API_URL
         res = requests.post(
-            "http://127.0.0.1:8000/check-access",
+            f"{API_URL}/check-access",
             json={"email": email}
         ).json()
 
