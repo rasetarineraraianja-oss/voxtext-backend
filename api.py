@@ -67,6 +67,19 @@ class ResetPasswordRequest(BaseModel):
 def root():
     return {"status": "VoxText API OK", "version": "2.0.0"}
 
+@app.post("/increment-trials")
+def route_increment_trials(data: dict):
+    email = data.get("email", "").strip().lower()
+    if not email:
+        return {"error": "missing_email"}
+    with get_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute("""
+                UPDATE users SET used_trials = used_trials + 1 WHERE email=%s
+            """, (email,))
+        conn.commit()
+    return {"status": "ok"}
+
 @app.head("/")
 def head_root():
     return Response(status_code=200)
