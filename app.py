@@ -405,19 +405,19 @@ class VoxTextApp:
 
     # ── Lock boutons ─────────────────────────────────────────────
     def _lock_buttons(self, locked=True):
-        for btn, original_bg in self._lockable_btns:
-            if btn is None:
-                continue
-            try:
-                btn._disabled = locked
-                if locked:
-                    btn._draw(DISABLED_COLOR)
-                    btn.config(cursor="arrow")
-                else:
-                    btn._draw(original_bg)
-                    btn.config(cursor="hand2")
-            except Exception:
-                pass
+    for btn, original_bg in self._lockable_btns:
+        if btn is None:
+            continue
+        try:
+            btn._disabled = locked
+            if locked:
+                btn._draw(DISABLED_COLOR)
+                btn.config(cursor="arrow")
+            else:
+                btn._draw(original_bg)
+                btn.config(cursor="hand2")
+        except Exception:
+            pass
 
     # ── Auth ─────────────────────────────────────────────────────
     def _on_login(self, email):
