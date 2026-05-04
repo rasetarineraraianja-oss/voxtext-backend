@@ -497,7 +497,25 @@ def payment_cancelled(provider: str = ""):
            Retournez dans VoxText et réessayez à tout moment.</p>
         <button class="btn" onclick="window.close()">Fermer cette page</button>
     </div>
-    <script>setTimeout(function() { window.close(); }, 5000);</script>
+<script>
+    var n = 5;
+    var timer = setInterval(function() {{
+        n--;
+        document.getElementById('countdown').textContent = n;
+        if (n <= 0) {{ clearInterval(timer); closeTab(); }}
+    }}, 1000);
+
+    function closeTab() {{
+        try {{
+            window.close();
+        }} catch(e) {{}}
+        setTimeout(function() {{
+            document.getElementById('status').innerHTML =
+                '✅ Paiement confirmé ! Retournez dans <strong>VoxText</strong> et reconnectez-vous pour activer le Pro.';
+            document.getElementById('countdown').style.display = 'none';
+        }}, 500);
+    }}
+</script>
 </body>
 </html>
 """)
