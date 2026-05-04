@@ -49,6 +49,7 @@ class RegisterRequest(BaseModel):
 class LoginRequest(BaseModel):
     email: str
     password: str
+    device_id: str = ""
 
 class AccessRequest(BaseModel):
     email: str
@@ -118,8 +119,9 @@ def route_register(data: RegisterRequest):
 
 @app.post("/login")
 def route_login(data: LoginRequest):
-    email    = data.email.strip().lower()
-    password = data.password.strip()
+    email     = data.email.strip().lower()
+    password  = data.password.strip()
+    device_id = data.device_id.strip()
 
     if not email or not password:
         return {"error": "missing_fields"}
@@ -136,11 +138,32 @@ def route_login(data: LoginRequest):
     if not bcrypt.checkpw(password.encode(), user["password"].encode()):
         return {"error": "invalid_password"}
 
-    with get_connection() as conn:
-        with conn.cursor() as cur:
-            cur.execute("UPDATE users SET last_seen=%s WHERE email=%s",
-                        (datetime.now().isoformat(), email))
-        conn.commit()
+    # Vérifier si ce device est déjà lié à un autre compte
+    if device_id:
+        with get_connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    "SELECT email FROM users WHERE device_fingerprint=%s AND email!=%s",
+                    (device_id, email)
+                )
+                other = cur.fetchone()
+        if other:
+            return {"error": "device_already_used"}
+
+        # Lier le device à ce compte
+        with get_connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    "UPDATE users SET device_fingerprint=%s, last_seen=%s WHERE email=%s",
+                    (device_id, datetime.now().isoformat(), email)
+                )
+            conn.commit()
+    else:
+        with get_connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute("UPDATE users SET last_seen=%s WHERE email=%s",
+                            (datetime.now().isoformat(), email))
+            conn.commit()
 
     return {
         "status":      "ok",
