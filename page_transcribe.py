@@ -591,6 +591,41 @@ class TranscribePage:
 
     filename = os.path.basename(path)
 
+    def _on_done(self, text):
+        self._transcribing = False
+        self._set_progress(1.0)
+        self.text_output.config(fg=self._t["TEXT"])
+        self.text_output.delete("1.0", "end")
+
+        for line in text.split("\n"):
+            if line.startswith("[") and "]" in line:
+                bracket_end = line.index("]") + 1
+                self.text_output.insert("end", line[:bracket_end], "timestamp")
+                self.text_output.insert("end", line[bracket_end:] + "\n")
+            else:
+                self.text_output.insert("end", line + "\n")
+
+        self.trans_status.config(text=self.tr("done"), fg=SUCCESS)
+
+        user = self.get_user()
+        plan = user.get("plan", "free") if user else "free"
+        rem = billing.remaining_free()
+
+        if plan == "free" and rem == 0:
+            messagebox.showinfo(
+                "Dernier essai gratuit utilisé",
+                "🎉 Transcription terminée !\n\n"
+                "Vous avez utilisé tous vos essais gratuits.\n"
+                "Passez en Pro (4,99 €/mois) pour continuer.",
+            )
+            self.show_tab("subscription")
+
+    def _on_error(self, err):
+        self._transcribing = False
+        self._progress_value = 0.0
+        self.trans_status.config(text=f"✖  {err}", fg=ERROR)
+        self.trans_prog.place(relwidth=0)
+
     def run():
         try:
             from faster_whisper import WhisperModel
