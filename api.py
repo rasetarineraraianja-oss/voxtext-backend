@@ -432,23 +432,27 @@ def payment_success(session_id: str = "", email: str = "", provider: str = "stri
         <div id="status">
             Fermeture automatique dans <span id="countdown">5</span>s
         </div>
-    </div>
-    <script>
-        var n = 5;
-        var timer = setInterval(function() {{
-            n--;
-            document.getElementById('countdown').textContent = n;
-            if (n <= 0) {{ clearInterval(timer); closeTab(); }}
-        }}, 1000);
-        function closeTab() {{
-            window.close();
-            setTimeout(function() {{
-                try {{ window.open('about:blank','_self').close(); }} catch(e) {{}}
-                document.getElementById('status').innerHTML =
-                    '👆 Fermez cet onglet avec <strong>Ctrl+W</strong>';
-            }}, 200);
-        }}
-    </script>
+        
+        <script>
+            var n = 5;
+            var timer = setInterval(function() {
+                n--;
+                document.getElementById('countdown').textContent = n;
+                if (n <= 0) { clearInterval(timer); closeTab(); }
+            }, 1000);
+        
+            function closeTab() {
+                window.close();
+                setTimeout(function() {
+                    // Si window.close() échoue, rediriger vers une page neutre
+                    window.location.href = "about:blank";
+                    setTimeout(function() {
+                        document.getElementById('status').innerHTML =
+                            '✅ Vous pouvez fermer cet onglet manuellement avec <strong>Ctrl+W</strong>';
+                    }, 500);
+                }, 300);
+            }
+        </script>
 </body>
 </html>
 """)
