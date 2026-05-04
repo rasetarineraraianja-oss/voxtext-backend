@@ -147,6 +147,16 @@ class AuthPage:
     # ─────────────────────────────────────────
     # ACTIONS
     # ─────────────────────────────────────────
+    def _get_device_id(self):
+        device_file = "device.id"
+        if os.path.exists(device_file):
+            with open(device_file, "r") as f:
+                return f.read().strip()
+        import uuid
+        device_id = str(uuid.uuid4())
+        with open(device_file, "w") as f:
+            f.write(device_id)
+        return device_id
 
     def _login(self):
         email = self.login_email.get().strip()
@@ -162,7 +172,11 @@ class AuthPage:
         try:
             res = requests.post(
                 f"{API_URL}/login",
-                json={"email": email, "password": password},
+                json={
+                    "email": email,
+                    "password": password,
+                    "device_id": self._get_device_id()
+                },
                 timeout=10,
             ).json()
 
@@ -178,6 +192,9 @@ class AuthPage:
 
                 elif err == "user_not_found":
                     self.login_status.config(text="Utilisateur introuvable ❌", fg=ERROR)
+
+                elif err == "device_already_used":
+                    self.login_status.config(text="Cet appareil est déjà lié à un autre compte ❌", fg=ERROR)
 
                 else:
                     self.login_status.config(text="Erreur ❌", fg=ERROR)
