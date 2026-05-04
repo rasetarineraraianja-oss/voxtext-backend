@@ -65,7 +65,7 @@ class SubscriptionPage:
         tk.Label(f, text="💳  Gérer mon abonnement",
                  bg=T["BG"], fg=T["TEXT"],
                  font=("Helvetica", 16, "bold")).pack(anchor="w", pady=(20,4), padx=20)
-        tk.Label(f, text="Choisissez votre méthode de paiement.",
+        tk.Label(f, text="Méthode de paiement.",
                  bg=T["BG"], fg=T["MUTED"],
                  font=("Helvetica", 10)).pack(anchor="w", pady=(0,16), padx=20)
 
@@ -193,7 +193,7 @@ class SubscriptionPage:
             self._form_pro_active(card, T, user)
 
     def _form_upgrade(self, card, T):
-        tk.Label(card, text="CHOISISSEZ VOTRE MÉTHODE DE PAIEMENT",
+        tk.Label(card, text="MÉTHODE DE PAIEMENT",
                  bg=T["CARD"], fg=T["MUTED"],
                  font=("Helvetica", 8, "bold")).pack(anchor="w", pady=(0,12))
 
@@ -223,14 +223,14 @@ class SubscriptionPage:
         self._stripe_btn.pack(side="left", padx=(0,12))
 
         # PayPal
-        self._paypal_btn = pill_btn(
-            btn_row,
-            f"🅿  Payer via PayPal  {billing.PRO_PRICE:.2f} €/mois",
-            lambda: self._pay("paypal"),
-            bg=PAYPAL_COLOR, hover=PAYPAL_HOVER,
-            w=260, h=44, fsize=10,
-        )
-        self._paypal_btn.pack(side="left")
+        #self._paypal_btn = pill_btn(
+         #   btn_row,
+          #  f"🅿  Payer via PayPal  {billing.PRO_PRICE:.2f} €/mois",
+           # lambda: self._pay("paypal"),
+         #   bg=PAYPAL_COLOR, hover=PAYPAL_HOVER,
+         #   w=260, h=44, fsize=10,
+        #)
+        #self._paypal_btn.pack(side="left")
 
         # Statut + polling
         self.sub_status = tk.Label(card, text="", bg=T["CARD"], fg=T["MUTED"],
@@ -298,11 +298,11 @@ class SubscriptionPage:
         stripe_lnk.pack(side="left", padx=(0,16))
         stripe_lnk.bind("<Button-1>", lambda e: self._open_portal("stripe"))
 
-        paypal_lnk = tk.Label(links_row, text="🅿  Gérer sur PayPal",
-                               bg=T["CARD"], fg=PAYPAL_COLOR,
-                               font=("Helvetica", 9, "underline"), cursor="hand2")
-        paypal_lnk.pack(side="left")
-        paypal_lnk.bind("<Button-1>", lambda e: self._open_portal("paypal"))
+        #paypal_lnk = tk.Label(links_row, text="🅿  Gérer sur PayPal",
+         #                      bg=T["CARD"], fg=PAYPAL_COLOR,
+          #                     font=("Helvetica", 9, "underline"), cursor="hand2")
+        #paypal_lnk.pack(side="left")
+        #paypal_lnk.bind("<Button-1>", lambda e: self._open_portal("paypal"))
 
     # ─────────────────────────────────────────
     # PAIEMENT
@@ -372,6 +372,7 @@ class SubscriptionPage:
         if hasattr(self, "_paypal_btn"):
             self._paypal_btn._disabled = False
             self._paypal_btn._draw(PAYPAL_COLOR)
+
 
     def _open_portal(self, provider: str):
         if provider == "stripe":

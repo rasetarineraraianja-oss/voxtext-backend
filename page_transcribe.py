@@ -541,30 +541,18 @@ class TranscribePage:
         self.frame.after(0, lambda v=value, s=status: self._set_progress(v, s))
 
     def transcribe(self):
-
-        email = self.get_user().get("email")  # adapte selon ton code
-
-        import requests
-
-        res = requests.post(
-            "http://127.0.0.1:8000/check-access",
-            json={"email": email}
-        ).json()
-
-        if res.get("error") == "limit_reached":
-            self.show_tab("subscription")  # ✅ correct dans ton app
-            return
         # ✅ Empêcher un double-clic pendant une transcription en cours
         if self._transcribing:
             return
 
         user = self.get_user()
+        email = user.get("email") if user else None
         plan = user.get("plan", "free") if user else "free"
 
         if plan != "pro":
             if not billing.can_transcribe():
                 messagebox.showwarning(
-                    self.tr("quota_exceeded_title"),
+                    "Quota épuisé",
                     f"Vous avez utilisé vos {billing.FREE_LIMIT} transcriptions gratuites.\n\n"
                     "Passez en plan Pro (4,99 €/mois) pour des transcriptions illimitées !",
                 )
@@ -575,19 +563,19 @@ class TranscribePage:
 
         path = self.audio_path.get().strip()
         if not path:
-            messagebox.showwarning(self.tr("no_file"), self.tr("select_file"))
+            messagebox.showwarning("Aucun fichier", self.tr("select_file"))
             return
         if not os.path.exists(path):
             messagebox.showerror(self.tr("file_not_found"), f"Le fichier est introuvable :\n{path}")
             return
         if not path.lower().endswith(FORMATS_SUPPORTES):
             messagebox.showerror(
-                self.tr("unsupported_format"),
+                "Format non supporté",
                 f"Formats acceptés : {', '.join(FORMATS_SUPPORTES)}",
             )
             return
         if os.path.getsize(path) == 0:
-            messagebox.showerror(self.tr("empty_file"), "Le fichier audio sélectionné est vide.")
+            messagebox.showerror("Fichier vide", "Le fichier audio sélectionné est vide.")
             return
 
         lang = self.language_var.get()
@@ -607,52 +595,38 @@ class TranscribePage:
             try:
                 from faster_whisper import WhisperModel
 
-                # ✅ Mise à jour statut chargement modèle
                 self.frame.after(0, lambda: self._set_progress(0.05, "⏳  Chargement du modèle..."))
                 model = WhisperModel("base", device="cpu", compute_type="int8")
 
                 self.frame.after(0, lambda: self._set_progress(0.10, "⏳  Analyse en cours..."))
                 segments, info = model.transcribe(path, language=lang)
 
-                # ✅ Éviter division par zéro si durée inconnue
                 total = info.duration if info.duration else 1
-
                 full_text = ""
 
                 for segment in segments:
                     full_text += segment.text + "\n"
-
-                    # ✅ Progression réelle entre 10% et 100%
                     progress = min(0.10 + (segment.end / total) * 0.90, 1.0)
-
-                    # ✅ Capture de variable locale pour éviter le bug de closure en lambda
                     self.frame.after(0, lambda p=progress: self._set_progress(p))
 
-                    if plan != "pro":
-                        billing.record_transcription(
-                            filename=filename,
-                            language=lang or "auto",
-                            char_count=len(full_text),
-                        )
+                # ✅ Enregistrer UNE SEULE fois après la transcription complète
+                if plan != "pro":
+                    billing.record_transcription(
+                        filename=filename,
+                        language=lang or "auto",
+                        char_count=len(full_text),
+                    )
 
-                # ✅ Capture full_text dans la lambda pour éviter bug de closure
                 self.frame.after(0, lambda t=full_text: self._on_done(t))
                 self.frame.after(0, self.update_badge)
                 self.frame.after(0, lambda: self.lock_buttons(False))
 
             except Exception as e:
                 msg = str(e)
-
-                billing.record_transcription_error(
-                    filename=filename,
-                    error_msg=msg,
-                )
-
-                # ✅ Capture msg dans la lambda
+                billing.record_transcription_error(filename=filename, error_msg=msg)
                 self.frame.after(0, lambda m=msg: self._on_error(f"Erreur : {m}"))
                 self.frame.after(0, lambda: self.lock_buttons(False))
 
-        # ✅ CORRECTION PRINCIPALE : lancement dans un thread séparé
         threading.Thread(target=run, daemon=True).start()
 
     def _on_done(self, text):
@@ -669,7 +643,7 @@ class TranscribePage:
             else:
                 self.text_output.insert("end", line + "\n")
 
-        self.trans_status.config(text= self.tr("done"), fg=SUCCESS)
+        self.trans_status.config(text=self.tr("done"), fg=SUCCESS)
 
         user = self.get_user()
         plan = user.get("plan", "free") if user else "free"
@@ -677,7 +651,7 @@ class TranscribePage:
 
         if plan == "free" and rem == 0:
             messagebox.showinfo(
-                self.tr("last_trial_title"),
+                "Dernier essai gratuit utilisé",
                 "🎉 Transcription terminée !\n\n"
                 "Vous avez utilisé tous vos essais gratuits.\n"
                 "Passez en Pro (4,99 €/mois) pour continuer.",

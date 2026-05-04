@@ -19,18 +19,17 @@ class DownloadPage:
     def __init__(self, root, theme, icons, lock_buttons_fn, user_email):
         self.root = root
         self.user_email = user_email
-        self._t           = theme
+        self._t = theme
         self.current_lang = "fr"
-        self._icons       = icons
+        self._icons = icons
         self.lock_buttons = lock_buttons_fn
 
-        self.dl_url      = tk.StringVar()
-        self.dl_fmt      = tk.StringVar(value="mp3")
+        self.dl_url = tk.StringVar()
+        self.dl_fmt = tk.StringVar(value="mp3")
         self.dl_fmt_btns = {}
         self.btn_download = None
 
         self.frame = self._build(self.root)
-
 
     def tr(self, key):
         from translations import TRANSLATIONS
@@ -53,7 +52,7 @@ class DownloadPage:
     # BUILD
     # ─────────────────────────────────────────
     def _build(self, parent):
-        T    = self._t
+        T = self._t
         page = tk.Frame(parent, bg=T["BG"])
 
         # ── Carte 1 : saisie URL + format + bouton ──
@@ -88,7 +87,6 @@ class DownloadPage:
             self.dl_fmt_btns[fmt] = (b, color)
 
         self._select_fmt("mp3", SUCCESS)
-
         # Bouton télécharger
         action_row = tk.Frame(card, bg=T["CARD"])
         action_row.pack(fill="x", pady=(14, 0))
@@ -104,6 +102,12 @@ class DownloadPage:
                                   font=("Helvetica", 9))
         self.dl_status.pack(side="left", padx=16)
 
+        # ── Barre de progression ──
+        prog_outer = tk.Frame(card, bg=T["BORDER"], height=3)
+        prog_outer.pack(fill="x", pady=(10, 0))
+        self.dl_prog = tk.Frame(prog_outer, bg=ACCENT2, height=3)
+        self.dl_prog.place(x=0, y=0, relheight=1, relwidth=0)
+
         # ── Carte 2 : plateformes supportées ──
         # Les logos sont répartis uniformément sur toute la largeur
         outer2, card2 = make_card(page, T)
@@ -114,10 +118,10 @@ class DownloadPage:
                  font=("Helvetica", 8, "bold")).pack(anchor="w", pady=(0, 12))
 
         platforms = [
-            ("YouTube",    "youtube.com",    "#FF0000"),
+            ("YouTube", "youtube.com", "#FF0000"),
             ("SoundCloud", "soundcloud.com", "#FF5500"),
-            ("Vimeo",      "vimeo.com",      "#1AB7EA"),
-            ("Spotify",    "spotify.com",    "#1DB954"),
+            ("Vimeo", "vimeo.com", "#1AB7EA"),
+            ("Spotify", "spotify.com", "#1DB954"),
         ]
 
         # Filtrer uniquement les plateformes dont l'icône est disponible
@@ -277,6 +281,24 @@ class DownloadPage:
         return page
 
     # ─────────────────────────────────────────
+    # progress bar
+    # ─────────────────────────────────────────
+
+    def _set_dl_progress(self, value, status=None):
+        value = max(0.0, min(1.0, float(value)))
+        try:
+            self.dl_prog.place(x=0, y=0, relheight=1, relwidth=value)
+            if status:
+                self.dl_status.config(text=status, fg=ACCENT)
+            else:
+                self.dl_status.config(text=f"⏳ {int(value * 100)}%", fg=ACCENT)
+        except Exception:
+            pass
+
+    def _queue_dl_progress(self, value, status=None):
+        self.frame.after(0, lambda v=value, s=status: self._set_dl_progress(v, s))
+
+    # ─────────────────────────────────────────
     # FORMAT
     # ─────────────────────────────────────────
     def _select_fmt(self, fmt, color):
@@ -284,7 +306,7 @@ class DownloadPage:
         T = self._t
         for f, (b, c) in self.dl_fmt_btns.items():
             b.config(
-                bg=c     if f == fmt else T["BORDER"],
+                bg=c if f == fmt else T["BORDER"],
                 fg=WHITE if f == fmt else T["TEXT2"],
             )
 
@@ -298,12 +320,9 @@ class DownloadPage:
         user = db.get_or_create_user(email)
         print("STEP 3: user =", user)
         if user["plan"] == "free" and user["downloads"] >= 3:
-            # déjà passé pro ou utilisé
-            messagebox.showwarning(
-                "Offre gratuite",
-
-            )
+            messagebox.showwarning("Offre gratuite", "Vous avez atteint la limite gratuite.")
             return
+
         url = self.dl_url.get().strip()
         print("STEP 4: before real download")
         if not url:
@@ -317,21 +336,31 @@ class DownloadPage:
         if fmt in ("mp3", "wav") and not FFMPEG_OK:
             messagebox.showerror(
                 "FFmpeg manquant",
-                f"La conversion en {fmt.upper()} nécessite FFmpeg.\n\n"
-                "https://ffmpeg.org/download.html",
+                f"La conversion en {fmt.upper()} nécessite FFmpeg.\n\nhttps://ffmpeg.org/download.html",
             )
             return
-
         if fmt == "mp4" and not FFMPEG_OK:
             messagebox.showerror(
                 "FFmpeg manquant",
-                "Le téléchargement MP4 HD nécessite FFmpeg pour fusionner audio et vidéo.\n\n"
-                "https://ffmpeg.org/download.html",
+                "Le téléchargement MP4 HD nécessite FFmpeg.\n\nhttps://ffmpeg.org/download.html",
             )
             return
 
         self.lock_buttons(True)
         self.dl_status.config(text=self.tr("downloading"), fg=ACCENT)
+        self.frame.after(0, lambda: self._set_dl_progress(0.0, "⏳  Démarrage..."))
+
+        def progress_hook(d):
+            if d["status"] == "downloading":
+                total = d.get("total_bytes") or d.get("total_bytes_estimate", 0)
+                downloaded = d.get("downloaded_bytes", 0)
+                if total > 0:
+                    pct = downloaded / total
+                    speed = d.get("speed", 0) or 0
+                    speed_str = f"{speed / 1024:.0f} KB/s" if speed else ""
+                    self._queue_dl_progress(pct * 0.9, f"⏳ {int(pct * 100)}%  {speed_str}")
+            elif d["status"] == "finished":
+                self._queue_dl_progress(0.95, "⏳  Conversion...")
 
         def run():
             try:
@@ -340,12 +369,15 @@ class DownloadPage:
                 os.makedirs(out_dir, exist_ok=True)
 
                 opts = self._build_opts(fmt, out_dir)
+                opts["progress_hooks"] = [progress_hook]
+                opts["quiet"] = True
 
                 with yt_dlp.YoutubeDL(opts) as ydl:
                     ydl.download([url])
 
                 billing.record_download(url=url, fmt=fmt, status="success")
 
+                self.frame.after(0, lambda: self._set_dl_progress(1.0, self.tr("download_done")))
                 self.frame.after(0, lambda: self.dl_status.config(
                     text=self.tr("download_done"), fg=SUCCESS))
                 self.frame.after(0, lambda: messagebox.showinfo(
@@ -357,6 +389,7 @@ class DownloadPage:
             except ImportError:
                 billing.record_download(url=url, fmt=fmt, status="error",
                                         error_msg="yt-dlp non installé")
+                self.frame.after(0, lambda: self._set_dl_progress(0.0))
                 self.frame.after(0, lambda: self.dl_status.config(
                     text=self.tr("ytdlp_missing_short"), fg=ERROR))
                 self.frame.after(0, lambda: messagebox.showerror(
@@ -367,10 +400,11 @@ class DownloadPage:
                 msg = str(e)
                 billing.record_download(url=url, fmt=fmt, status="error", error_msg=msg)
                 titre, detail = self._classify_error(msg)
+                self.frame.after(0, lambda: self._set_dl_progress(0.0))
                 self.frame.after(0, lambda: self.dl_status.config(
                     text=f"✖  {titre}", fg=ERROR))
                 self.frame.after(0, lambda t=titre, d=detail:
-                    messagebox.showerror(t, d))
+                messagebox.showerror(t, d))
                 self.frame.after(0, lambda: self.lock_buttons(False))
 
         threading.Thread(target=run, daemon=True).start()
