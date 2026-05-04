@@ -3,3 +3,6 @@ uvicorn[standard]
 stripe
 python-dotenv
 bcrypt
+httpx
+requests
+psycopg2-binary
