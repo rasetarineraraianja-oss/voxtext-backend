@@ -88,21 +88,26 @@ class DownloadPage:
             self.dl_fmt_btns[fmt] = (b, color)
 
         self._select_fmt("mp3", SUCCESS)
-
         # Bouton télécharger
         action_row = tk.Frame(card, bg=T["CARD"])
         action_row.pack(fill="x", pady=(14, 0))
-
+        
         self.btn_download = pill_btn(
             action_row, self.tr("download_btn"), self.download,
             bg=ACCENT2, hover="#3ab8b0", w=200, h=42, fsize=11,
         )
         self.btn_download.pack(side="left")
-
+        
         self.dl_status = tk.Label(action_row, text="",
                                   bg=T["CARD"], fg=T["MUTED"],
                                   font=("Helvetica", 9))
         self.dl_status.pack(side="left", padx=16)
+        
+        # ── Barre de progression ──
+        prog_outer = tk.Frame(card, bg=T["BORDER"], height=3)
+        prog_outer.pack(fill="x", pady=(10, 0))
+        self.dl_prog = tk.Frame(prog_outer, bg=ACCENT2, height=3)
+        self.dl_prog.place(x=0, y=0, relheight=1, relwidth=0)
 
         # ── Carte 2 : plateformes supportées ──
         # Les logos sont répartis uniformément sur toute la largeur
@@ -275,6 +280,23 @@ class DownloadPage:
             ).pack(anchor="w")
 
         return page
+    # ─────────────────────────────────────────
+    # progress bar
+    # ─────────────────────────────────────────
+    
+    def _set_dl_progress(self, value, status=None):
+        value = max(0.0, min(1.0, float(value)))
+        try:
+            self.dl_prog.place(x=0, y=0, relheight=1, relwidth=value)
+            if status:
+                self.dl_status.config(text=status, fg=ACCENT)
+            else:
+                self.dl_status.config(text=f"⏳ {int(value * 100)}%", fg=ACCENT)
+        except Exception:
+            pass
+    
+    def _queue_dl_progress(self, value, status=None):
+        self.frame.after(0, lambda v=value, s=status: self._set_dl_progress(v, s))
 
     # ─────────────────────────────────────────
     # FORMAT
@@ -298,12 +320,9 @@ class DownloadPage:
         user = db.get_or_create_user(email)
         print("STEP 3: user =", user)
         if user["plan"] == "free" and user["downloads"] >= 3:
-            # déjà passé pro ou utilisé
-            messagebox.showwarning(
-                "Offre gratuite",
-
-            )
+            messagebox.showwarning("Offre gratuite", "Vous avez atteint la limite gratuite.")
             return
+    
         url = self.dl_url.get().strip()
         print("STEP 4: before real download")
         if not url:
@@ -312,40 +331,53 @@ class DownloadPage:
         if not (url.startswith("http://") or url.startswith("https://")):
             messagebox.showerror(self.tr("invalid_url"), self.tr("invalid_url_msg"))
             return
-
+    
         fmt = self.dl_fmt.get()
         if fmt in ("mp3", "wav") and not FFMPEG_OK:
             messagebox.showerror(
                 "FFmpeg manquant",
-                f"La conversion en {fmt.upper()} nécessite FFmpeg.\n\n"
-                "https://ffmpeg.org/download.html",
+                f"La conversion en {fmt.upper()} nécessite FFmpeg.\n\nhttps://ffmpeg.org/download.html",
             )
             return
-
         if fmt == "mp4" and not FFMPEG_OK:
             messagebox.showerror(
                 "FFmpeg manquant",
-                "Le téléchargement MP4 HD nécessite FFmpeg pour fusionner audio et vidéo.\n\n"
-                "https://ffmpeg.org/download.html",
+                "Le téléchargement MP4 HD nécessite FFmpeg.\n\nhttps://ffmpeg.org/download.html",
             )
             return
-
+    
         self.lock_buttons(True)
         self.dl_status.config(text=self.tr("downloading"), fg=ACCENT)
-
+        self.frame.after(0, lambda: self._set_dl_progress(0.0, "⏳  Démarrage..."))
+    
+        def progress_hook(d):
+            if d["status"] == "downloading":
+                total = d.get("total_bytes") or d.get("total_bytes_estimate", 0)
+                downloaded = d.get("downloaded_bytes", 0)
+                if total > 0:
+                    pct = downloaded / total
+                    speed = d.get("speed", 0) or 0
+                    speed_str = f"{speed/1024:.0f} KB/s" if speed else ""
+                    self._queue_dl_progress(pct * 0.9, f"⏳ {int(pct*100)}%  {speed_str}")
+            elif d["status"] == "finished":
+                self._queue_dl_progress(0.95, "⏳  Conversion...")
+    
         def run():
             try:
                 import yt_dlp
                 out_dir = os.path.join(os.path.expanduser("~"), "Downloads", "VoxText")
                 os.makedirs(out_dir, exist_ok=True)
-
+    
                 opts = self._build_opts(fmt, out_dir)
-
+                opts["progress_hooks"] = [progress_hook]
+                opts["quiet"] = True
+    
                 with yt_dlp.YoutubeDL(opts) as ydl:
                     ydl.download([url])
-
+    
                 billing.record_download(url=url, fmt=fmt, status="success")
-
+    
+                self.frame.after(0, lambda: self._set_dl_progress(1.0, self.tr("download_done")))
                 self.frame.after(0, lambda: self.dl_status.config(
                     text=self.tr("download_done"), fg=SUCCESS))
                 self.frame.after(0, lambda: messagebox.showinfo(
@@ -353,26 +385,28 @@ class DownloadPage:
                     f"{self.tr('file_saved_in')} :\n{out_dir}",
                 ))
                 self.frame.after(0, lambda: self.lock_buttons(False))
-
+    
             except ImportError:
                 billing.record_download(url=url, fmt=fmt, status="error",
                                         error_msg="yt-dlp non installé")
+                self.frame.after(0, lambda: self._set_dl_progress(0.0))
                 self.frame.after(0, lambda: self.dl_status.config(
                     text=self.tr("ytdlp_missing_short"), fg=ERROR))
                 self.frame.after(0, lambda: messagebox.showerror(
                     self.tr("ytdlp_missing"), self.tr("ytdlp_install_msg")))
                 self.frame.after(0, lambda: self.lock_buttons(False))
-
+    
             except Exception as e:
                 msg = str(e)
                 billing.record_download(url=url, fmt=fmt, status="error", error_msg=msg)
                 titre, detail = self._classify_error(msg)
+                self.frame.after(0, lambda: self._set_dl_progress(0.0))
                 self.frame.after(0, lambda: self.dl_status.config(
                     text=f"✖  {titre}", fg=ERROR))
                 self.frame.after(0, lambda t=titre, d=detail:
                     messagebox.showerror(t, d))
                 self.frame.after(0, lambda: self.lock_buttons(False))
-
+    
         threading.Thread(target=run, daemon=True).start()
 
     def _build_opts(self, fmt, out_dir):
