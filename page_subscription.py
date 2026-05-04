@@ -65,7 +65,7 @@ class SubscriptionPage:
         tk.Label(f, text="💳  Gérer mon abonnement",
                  bg=T["BG"], fg=T["TEXT"],
                  font=("Helvetica", 16, "bold")).pack(anchor="w", pady=(20,4), padx=20)
-        tk.Label(f, text="Choisissez votre méthode de paiement.",
+        tk.Label(f, text="Méthode de paiement.",
                  bg=T["BG"], fg=T["MUTED"],
                  font=("Helvetica", 10)).pack(anchor="w", pady=(0,16), padx=20)
 
