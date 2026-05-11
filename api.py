@@ -84,6 +84,58 @@ def route_increment_trials(data: dict):
 @app.head("/")
 def head_root():
     return Response(status_code=200)
+    
+# =============================================================
+# TRANSCRIPTION — OpenAI Whisper
+# =============================================================
+from fastapi import UploadFile, File, Form
+import tempfile
+import os
+
+@app.post("/transcribe")
+async def route_transcribe(
+    file: UploadFile = File(...),
+    language: str = Form("auto"),
+    email: str = Form(""),
+):
+    try:
+        from openai import OpenAI
+        client = OpenAI(api_key=os.environ.get("OPENAI_API_KEY"))
+
+        # Sauvegarder le fichier temporairement
+        suffix = os.path.splitext(file.filename)[1] or ".mp3"
+        with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
+            content = await file.read()
+            tmp.write(content)
+            tmp_path = tmp.name
+
+        # Transcrire avec Whisper
+        with open(tmp_path, "rb") as audio_file:
+            params = {
+                "model": "whisper-1",
+                "file": audio_file,
+            }
+            if language and language != "auto":
+                params["language"] = language
+
+            transcript = client.audio.transcriptions.create(**params)
+
+        os.unlink(tmp_path)
+
+        # Incrémenter les essais
+        if email:
+            with get_connection() as conn:
+                with conn.cursor() as cur:
+                    cur.execute(
+                        "UPDATE users SET used_trials = used_trials + 1 WHERE email=%s",
+                        (email,)
+                    )
+                conn.commit()
+
+        return {"status": "ok", "text": transcript.text}
+
+    except Exception as e:
+        return {"error": str(e)}
 
 # =============================================================
 # AUTH
