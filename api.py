@@ -329,6 +329,66 @@ def route_activate_pro(email: str):
         "pro_expires": user["pro_expires"],
     }
 
+# =============================================================
+# DOWNLOAD — yt-dlp
+# =============================================================
+@app.post("/download")
+async def route_download(data: dict):
+    url   = data.get("url", "").strip()
+    fmt   = data.get("fmt", "mp3")
+    email = data.get("email", "")
+
+    if not url:
+        return {"error": "missing_url"}
+
+    try:
+        import yt_dlp
+        import tempfile
+
+        out_dir = tempfile.mkdtemp()
+        tpl     = os.path.join(out_dir, "%(title)s.%(ext)s")
+
+        if fmt == "mp3":
+            opts = {
+                "format": "bestaudio/best",
+                "outtmpl": tpl,
+                "quiet": True,
+                "postprocessors": [{
+                    "key": "FFmpegExtractAudio",
+                    "preferredcodec": "mp3",
+                    "preferredquality": "192",
+                }],
+            }
+        elif fmt == "wav":
+            opts = {
+                "format": "bestaudio/best",
+                "outtmpl": tpl,
+                "quiet": True,
+                "postprocessors": [{
+                    "key": "FFmpegExtractAudio",
+                    "preferredcodec": "wav",
+                }],
+            }
+        else:
+            opts = {
+                "format": "best[ext=mp4]/best",
+                "outtmpl": tpl,
+                "quiet": True,
+            }
+
+        with yt_dlp.YoutubeDL(opts) as ydl:
+            info = ydl.extract_info(url, download=True)
+            filename = ydl.prepare_filename(info)
+
+        from fastapi.responses import FileResponse
+        return FileResponse(
+            filename,
+            media_type="application/octet-stream",
+            filename=os.path.basename(filename),
+        )
+
+    except Exception as e:
+        return {"error": str(e)}
 
 # =============================================================
 # STRIPE — SESSION DE PAIEMENT
